@@ -1,0 +1,101 @@
+---
+title: "Meditech Medicaid Overview"
+author: "James Sheldon"
+date: "February 23, 2017"
+output: 
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+```
+
+```{r data, echo=FALSE, message=FALSE, warning=FALSE}
+data <- read_csv("report.csv")
+
+data$`Date - Admit - Date` <- as_date(as.character(data$`Date - Admit - Date`), format = "%m/%d/%Y")
+data$`Date - Discharge - Date` <- as_date(as.character(data$`Date - Discharge - Date`), format = "%m/%d/%Y")
+
+data <- data %>% filter(!is.na(`Provider Name`)) %>% filter(Charges > 0)
+
+data <- data %>% select(-`Patient Type`, -`Closed Account Name`, - `BAR Status Name`, -`Patient ID Name`, 
+    -`Employer Name Name`, -`Age Name`, -`Date - Discharge - Date Name`, -`Date - Admit - Date Name`, 
+    -`Admit Type`, -`Admit Service`, -`Account Type`, -(`MS-DRG Name`:`Insurance Group Name COB 1 Name`))
+
+data$`Provider Name`[data$Provider == "DA"] <- "USMC"
+data$`Provider Name`[data$Provider == "DB"] <- "SJHE"
+data$`Provider Name`[data$Provider == "DC"] <- "SJMC"
+data$`Provider Name`[data$Provider == "DH"] <- "CMC"
+data$`Provider Name`[data$Provider == "DJ"] <- "SMH"
+data$`Provider Name`[data$Provider == "DM"] <- "MMC"
+
+comma <- function(x) {
+    format(x, digits = 2, big.mark = ",", scientific = FALSE)
+}
+
+```
+
+## Data Assumptions
+
+The following assumptions were made when gathering the data:
+
+1. Data includes all Acute Care patient types with admission dates in 2017 as of 12:30AM CST on 2017-02-23. 
+2. Data was run at a high level for purposes of accurate volume counts.
+3. The following filters were used in the eSimon extract
+    - Payer Number includes `4`, `5`, `6` and `7`.
+    - Admission date is in the range `1/1/2017` to `12/31/2017`.
+    - Patient Type includes `E`, `O`, `S` and `I`.
+4. All claims with $0 in billed charges were removed.
+
+```{r explore, echo=FALSE}
+knitr::kable(data %>% group_by(`Provider Name`) %>% summarise("Cases" = comma(n())), 
+             caption = paste0("2017 YTD Provena Medicaid Volume as of ", max(data$`Date - Admit - Date`)))
+
+knitr::kable(data %>% group_by(`Payer Name`, `Provider Name`) %>% summarise(n = comma(n())) %>% 
+            spread(`Payer Name`, n), caption = paste0("2017 YTD Provena Medicaid Volumes by Provider as of ", 
+            max(data$`Date - Admit - Date`)))
+
+knitr::kable(data %>% group_by(`Insurance Plan Code - Primary Name`, `Provider Name`) %>% summarise(n = comma(n())) %>% 
+            spread(`Provider Name`, n, fill = 0), 
+            caption = paste0("2017 YTD Provena Medicaid Volumes by Insurance Code as of ", max(data$`Date - Admit - Date`)))
+
+knitr::kable(data %>% group_by(`Financial Class Name`, `Provider Name`) %>% summarise(n = comma(n())) %>% 
+            spread(`Financial Class Name`, n, fill = 0), 
+            caption = paste0("2017 YTD Provena Medicaid Volumes by Financial Class as of ", max(data$`Date - Admit - Date`)))
+
+knitr::kable(data %>% group_by(`Patient Class Name`, `Provider Name`) %>% summarise(n = comma(n())) %>% 
+            spread(`Patient Class Name`, n, fill = 0), 
+            caption = paste0("2017 YTD Provena Medicaid Volumes by Patient Class as of ", max(data$`Date - Admit - Date`)))
+
+knitr::kable(data %>% group_by(`Admit Service Name`, `Provider Name`) %>% summarise(n = comma(n())) %>% 
+            spread(`Provider Name`, n, fill = 0), 
+            caption = paste0("2017 YTD Provena Medicaid Volumes by Admit Service as of ", max(data$`Date - Admit - Date`)))
+
+knitr::kable(data %>% group_by(`Account Type Name`, `Provider Name`) %>% summarise(n = comma(n())) %>% 
+            spread(`Provider Name`, n, fill = 0), 
+            caption = paste0("2017 YTD Provena Medicaid Volumes by Admit Service as of ", max(data$`Date - Admit - Date`)))
+
+knitr::kable(data %>% filter(`Patient Type Name` == "Inpatient") %>% group_by(`MS-DRG`) %>% 
+            summarise(n = comma(n())) %>% top_n(10,n) %>% arrange(desc(n)), 
+            caption = paste0("2017 YTD Provena Medicaid Inpatient Top 10 DRGs as of ", max(data$`Date - Admit - Date`)))
+
+data %>% ggplot(mapping = aes(x = Age, fill = `Provider Name`)) + geom_histogram(bins = 30) + 
+    ggtitle("Distribution of Patient Ages by Hospital")
+
+data %>% ggplot(mapping = aes(x = `Date - Admit - Date`, fill = `Provider Name`)) + geom_histogram(bins = 15) + 
+    ggtitle("Distribution of Admission Dates by Hospital")
+```
+
+## Financial Overview
+
+```{r financial, echo=FALSE}
+t1 <- data %>% group_by(`Provider Name`) %>% summarise("Charges" = sum(Charges), 
+    "Expected" = sum(`Expected Pay Billing Sys`)) %>% mutate("POC" = paste0(round(Expected / Charges * 100,2),"%"))
+t1$Charges <- comma(t1$Charges)
+t1$Expected <- comma(t1$Expected)
+
+knitr::kable(t1, caption = paste0("2017 YTD Provena Medicaid Volumes by Patient Class as of ", max(data$`Date - Admit - Date`)))
+```
