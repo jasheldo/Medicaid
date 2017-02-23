@@ -14,6 +14,9 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 
+# CSV Files with Raw Data
+*.csv
+
 # Windows shortcuts
 *.lnk
 
