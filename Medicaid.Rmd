@@ -50,6 +50,8 @@ The following assumptions were made when gathering the data:
     - Patient Type includes `E`, `O`, `S` and `I`.
 4. All claims with $0 in billed charges were removed.
 
+## Summary Tables
+
 ```{r explore, echo=FALSE}
 knitr::kable(data %>% group_by(`Provider Name`) %>% summarise("Cases" = comma(n())), 
              caption = paste0("2017 YTD Provena Medicaid Volume as of ", max(data$`Date - Admit - Date`)))
